@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>MiniNet</RootNamespace>
+    <Description>A small ASP.NET Core-style web framework built from scratch on raw TCP sockets.</Description>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MiniNet.Tests" />
+    <InternalsVisibleTo Include="MiniNet.Benchmarks" />
+  </ItemGroup>
+</Project>
