@@ -1,0 +1,54 @@
+name: Deploy to Azure
+
+# Run manually from the Actions tab. See README "Deploying to Azure" for the one-time setup.
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # lets azure/login sign in with OpenID Connect, so no Azure password is stored in GitHub
+  contents: read
+  packages: write   # push the image to GitHub Container Registry
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image name
+        # Registry names must be lower-case.
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/mininet-appointments:${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: samples/AppointmentsApi/Dockerfile
+          push: true
+          tags: ${{ env.IMAGE }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure and app
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            url=$(az deployment group create \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --template-file infra/main.bicep \
+              --parameters containerImage="${{ env.IMAGE }}" \
+                           sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
+                           registryUsername="${{ github.actor }}" \
+                           registryPassword="${{ secrets.GHCR_PULL_TOKEN }}" \
+              --query properties.outputs.url.value -o tsv)
+            echo "Deployed to $url"
+            echo "### Deployed to $url" >> "$GITHUB_STEP_SUMMARY"
